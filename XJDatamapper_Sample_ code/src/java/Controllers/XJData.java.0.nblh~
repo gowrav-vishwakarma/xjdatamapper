@@ -1,0 +1,1492 @@
+package Controllers;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+
+public class XJData extends XConfiguration {
+
+    private String select;
+    private String where;
+    private int cond;
+    private int hcond;
+    private int ocond;
+    private int gcond;
+    private String limit = "";
+    public XJData[] data;
+    protected String table;
+    protected String tablePrefix = "";
+    private ArrayList<String> field = new ArrayList<String>();
+    private ArrayList<String> value = new ArrayList<String>();
+    private ArrayList<String> selected = new ArrayList<String>();
+    private ArrayList<String> selectedField = new ArrayList<String>();
+    private HashMap<String, String> fieldValue = new HashMap<String, String>();
+    private String completeQuery;
+    private String space;
+    private String orderby;
+    private String groupby;
+    private String having;
+    private String delete;
+    private String update;
+    private String aggrValue;
+    private String offset = "";
+    protected String hasOne= "";
+    protected String hasMany= "";
+    private String relatedClass = "";
+    private String join_self_as = "";
+    private String join_other_as = "";
+    private String relatedTable = "";
+    private String otherRel = "";
+    
+    
+
+    public XJData() throws ClassNotFoundException, SQLException {
+
+        super();
+        this.completeQuery = "";
+        this.where = " where ";
+        this.space = " ";
+        this.orderby = " ";
+        this.groupby = " ";
+        this.having = " having ";
+        this.select = " select ";
+        this.delete = " delete from ";
+        this.update = " update ";
+        this.selected.clear();
+        this.selectedField.clear();
+
+    }
+
+    private ResultSet findingColumns(String table) throws ClassNotFoundException, SQLException {
+        
+        Class.forName("com.mysql.jdbc.Driver");
+        Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/information_schema", "root", "");
+        Statement st = con.createStatement();
+        String s = "select columns.column_name from columns where columns.table_name='" + this.tablePrefix + table + "' and columns.table_schema='" + super.dbName + "' ";
+        ResultSet rs = st.executeQuery(s);
+        return rs;
+    }
+
+    private ResultSet findingNumColumns(String table) throws ClassNotFoundException, SQLException {
+        
+        Class.forName("com.mysql.jdbc.Driver");
+        Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/information_schema", "root", "");
+        Statement st = con.createStatement();
+        String s = "select count(columns.column_name) from columns where columns.table_name='" + this.tablePrefix + table + "' and columns.table_schema='" + super.dbName + "' ";
+        ResultSet rs = st.executeQuery(s);
+        return rs;
+    }
+
+    public void _(String key, String value) {
+        this.field.add(key);
+        this.value.add(value);
+    }
+
+    public String _(String key) {
+        return this.fieldValue.get(key);
+    }
+
+    public void setTableName(String table) {
+        this.table = this.tablePrefix + table;
+    }
+
+    public int save() throws SQLException, ClassNotFoundException {
+        String sql = " insert into " + this.tablePrefix + this.table + "(";
+        for (int i = 0; i < field.size(); i++) {
+            sql += "" + field.get(i) + ",";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        sql += ") values (";
+        for (int i = 0; i < value.size(); i++) {
+            sql += "'" + value.get(i) + "',";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        sql += ")";
+        DBOperations dbobj = new DBOperations();
+        this.clear();
+        return dbobj.ModifyQuery(sql);
+
+    }
+
+    public int save(ArrayList al) throws SQLException, ClassNotFoundException {
+        String sql = " insert into " + this.tablePrefix + this.table + "(";
+        ResultSet rs;
+        rs = findingColumns(this.table);
+        while (rs.next()) {
+            sql += "" + rs.getString("COLUMN_NAME") + ",";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        sql += ") values (";
+        for (int i = 0; i < al.size(); i++) {
+            sql += "'" + al.get(i) + "',";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        sql += ")";
+
+        DBOperations dbobj = new DBOperations();
+        this.clear();
+        return dbobj.ModifyQuery(sql);
+
+    }
+
+    public String completeQuery() {
+        return "last query " + this.completeQuery;
+    }
+
+    public XJData orderby(String field, String type) {
+
+        if (ocond == 0) {
+            this.orderby += " order by " + field + this.space + type;
+        } else {
+            this.orderby += "," + field + this.space + type;
+        }
+        this.ocond++;
+        return this;
+    }
+
+    public XJData orderby(String array) {
+
+        this.orderby += " order by " + array;
+        this.ocond++;
+        return this;
+    }
+
+    public XJData orderby(ArrayList<String> array) {
+
+        this.orderby += " order by ";
+        for (int i = 0; i < array.size(); i++) {
+            this.orderby += array.get(i) + ",";
+        }
+        this.orderby = this.orderby.substring(0, this.orderby.lastIndexOf(","));
+        this.ocond++;
+        return this;
+    }
+
+    public XJData groupby(ArrayList<String> array) {
+        this.groupby += " group by ";
+        for (int i = 0; i < array.size(); i++) {
+            this.groupby += array.get(i) + ",";
+        }
+        this.groupby = this.groupby.substring(0, this.groupby.lastIndexOf(","));
+        this.gcond++;
+        return this;
+    }
+
+    public XJData groupby(String field) {
+
+        if (gcond == 0) {
+            this.groupby += " group by " + field;
+        } else {
+            this.groupby += "," + field;
+        }
+        this.gcond++;
+        return this;
+
+    }
+
+    public XJData having(String array) {
+        if (hcond == 0) {
+            this.having += "(" + array + ")";
+        } else {
+            this.having += " and (" + array + ")";
+        }
+        hcond++;
+        return this;
+    }
+
+    public XJData having(ArrayList<String> array) {
+
+        String newSql = "";
+        for (int i = 0; i < array.size(); i++) {
+            String temp = array.get(i);
+            String[] splitted = temp.split("'");
+            newSql += splitted[0] + this.space + splitted[1] + this.space + "'" + splitted[2] + "' and ";
+
+        }
+        newSql = newSql.substring(0, newSql.lastIndexOf("and"));
+
+        if (hcond == 0) {
+            this.having += "(" + newSql + ")";
+        } else {
+            this.having += " and (" + newSql + ")";
+        }
+        hcond++;
+        return this;
+    }
+
+    public XJData having(String var1, String op, String var2) {
+        if (this.hcond == 0) {
+            this.having += "(" + var1 + this.space + op + this.space + "'" + var2 + "')";
+        } else {
+            this.having += " and( " + var1 + this.space + op + this.space + "'" + var2 + "')";
+        }
+        hcond++;
+
+        return this;
+    }
+
+    public XJData having_Or(String var1, String op, String var2) {
+        if (this.hcond == 0) {
+            this.having += "(" + var1 + this.space + op + this.space + "'" + var2 + "')";
+        } else {
+            this.having += " or( " + var1 + this.space + op + this.space + "'" + var2 + "')";
+        }
+        hcond++;
+        return this;
+    }
+    
+    public XJData where_Related(String relation , String condition) throws Exception{
+        
+        setRelation(relation);
+        where(condition);
+        
+        return this;
+    }
+    public XJData[] get_By_Related(String relation , String condition) throws Exception{
+        
+        setRelation(relation);
+        where(condition);
+        return get();
+    }
+    
+    public XJData where_Related(String relation , String parameter,  XJData var) throws Exception{
+        
+        setRelation(relation);
+        where(parameter,"=",var._("ID"));
+        return this;
+    }
+    
+    public XJData[] get_By_Related(String relation , String parameter,  XJData var) throws Exception{
+        
+        setRelation(relation);
+        where(parameter,"=",var._("ID"));
+        return get();
+    }
+    
+    public XJData where_Related(String relation , String var1, String op, String var2) throws Exception{
+        
+        setRelation(relation);
+        where(var1,op,var2);
+        return this;
+    }
+    
+    public XJData[] get_By_Related(String relation , String var1, String op, String var2) throws Exception{
+        
+        setRelation(relation);
+        where(var1,op,var2);
+        return get();
+    }
+    
+    public XJData where_Related(String relation , ArrayList<String> array) throws Exception{
+        
+        setRelation(relation);
+        where(array);
+        return this;
+    }
+    
+    public XJData[] get_By_Related_In(String relation, String field, ArrayList values) throws Exception {
+        
+        setRelation(relation);
+        where(values);
+        return get();
+    }
+    public XJData where_Related_In(String relation, String field, ArrayList values) throws Exception {
+        
+        setRelation(relation);
+        where(values);
+        return this;
+    }
+    
+    
+    public XJData where_Related_Not_In(String relation, String field, ArrayList values) throws Exception {
+     
+        setRelation(relation);
+        where_Not_In(field, values);
+        return this;
+        
+    }
+    
+    public XJData[] get_By_Related_Not_In(String relation, String field, ArrayList values) throws Exception {
+     
+        setRelation(relation);
+        where_Not_In(field, values);
+        return get();
+        
+    }
+    
+    /*public XJData[] get_By_Related(XJData data) throws Exception{
+        
+        String className = data.getClass().toString();
+        className = className.substring(className.indexOf(" ")+1, className.length());
+        Class newClass = Class.forName(className);        
+        Constructor cons = newClass.getConstructor();
+        Object o = cons.newInstance() ;
+        
+        setRelation("EmployeeOf");
+        where("ID","=",data._("ID"));
+        return get();
+    }*/
+            
+        
+    public XJData where(String var1, String op, String var2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + op + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " and (" + table + "." +  var1 + this.space + op + this.space + "'" + var2 + "') ";
+        }
+        cond++;
+        return this;
+    }
+    
+    public XJData where_Between(String field, String value1, String value2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + this.space + "between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        } else {
+            this.where += " and (" + table + "." + field + this.space + "between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        }
+        cond++;
+        return this;
+    }
+    
+    public XJData where_Or_Between(String field, String value1, String value2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + this.space + "between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        } else {
+            this.where += " or (" + table + "." + field + this.space + "between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        }
+        cond++;
+        return this;
+    }
+    public XJData where_Not_Between(String field, String value1, String value2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + this.space + " not between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        } else {
+            this.where += " and (" + table + "." + field + this.space + " not between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        }
+        cond++;
+        return this;
+    }
+    public XJData where_Or_Not_Between(String field, String value1, String value2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + this.space + " not between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        } else {
+            this.where += " or (" + table + "." + field + this.space + "between" + this.space + "'" + value1 + "'" + this.space + " and " + this.space + "'"+value2+"')";
+        }
+        cond++;
+        return this;
+    }
+
+
+    public XJData where(String array) {
+         String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        if (cond == 0) {
+            this.where += "(" + array + ")";
+        } else {
+            this.where += " and (" + array + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where(ArrayList<String> array) {
+         String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String newSql = "";
+        for (int i = 0; i < array.size(); i++) {
+            String temp = array.get(i);
+            String[] splitted = temp.split("!");
+            newSql += table + "." + splitted[0] + this.space + splitted[1] + this.space + "'" + splitted[2] + "' and ";
+
+        }
+        newSql = newSql.substring(0, newSql.lastIndexOf("and"));
+
+        if (cond == 0) {
+            this.where += "(" + newSql + ")";
+        } else {
+            this.where += " and (" + newSql + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where_In(String field, ArrayList values) {
+         String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String str = "(";
+        for (int i = 0; i < values.size(); i++) {
+            str += "'" + values.get(i) + "',";
+        }
+        str = str.substring(0, str.lastIndexOf(","));
+        str += ")";
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + " in " + str + ")";
+        } else {
+            this.where += " and ( " + table + "." + field + " in " + str + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where_Or_In(String field, ArrayList values) {
+         String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String str = "(";
+        for (int i = 0; i < values.size(); i++) {
+            str += "'" + values.get(i) + "',";
+        }
+        str = str.substring(0, str.lastIndexOf(","));
+        str += ")";
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + " in " + str + ")";
+        } else {
+            this.where += " or ( " + table + "." + field + " in " + str + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where_Not_In(String field, ArrayList values) {
+         String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String str = "(";
+        for (int i = 0; i < values.size(); i++) {
+            str += "'" + values.get(i) + "',";
+        }
+        str = str.substring(0, str.lastIndexOf(","));
+        str += ")";
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + " not in " + str + ")";
+        } else {
+            this.where += " and ( " + table + "." + field + " not in " + str + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where_Or_Not_In(String field, ArrayList values) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String str = "(";
+        for (int i = 0; i < values.size(); i++) {
+            str += "'" + values.get(i) + "',";
+        }
+        str = str.substring(0, str.lastIndexOf(","));
+        str += ")";
+        if (cond == 0) {
+            this.where += " (" + table + "." + field + " not in " + str + ")";
+        } else {
+            this.where += " or ( " + table + "." + field + " not in " + str + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData where_Or(String var1, String op, String var2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + op + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " or( " + table + "." + var1 + this.space + op + this.space + "'" + var2 + "') ";
+        }
+        
+        cond++;
+        return this;
+    }
+
+    public XJData like(String array) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += "(" + array + ")";
+        } else {
+            this.where += " and (" + array + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like(ArrayList<String> array) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        String newSql = "";
+        for (int i = 0; i < array.size(); i++) {
+            String temp = array.get(i);
+            String[] splitted = temp.split("!");
+            newSql += table + "." + splitted[0] + " like " + "'" + splitted[1] + "' and ";
+
+        }
+        newSql = newSql.substring(0, newSql.lastIndexOf("and"));
+
+        if (cond == 0) {
+            this.where += "(" + newSql + ")";
+        } else {
+            this.where += " and (" + newSql + ")";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like(String var1, String var2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " and( " + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "') ";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like(String var1, String var2, String place) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+
+        if (cond == 0) {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "%')";
+            }
+
+        } else {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " and(" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " and(" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " and(" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "%')";
+            }
+
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Or(String var1, String var2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " or(" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "') ";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Or(String var1, String var2, String place) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+
+        if (cond == 0) {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " (" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "%')";
+            }
+
+        } else {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " or(" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " or(" + table + "." + var1 + this.space + " like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " or(" + table + "." + var1 + this.space + " like " + this.space + "'%" + var2 + "%')";
+            }
+
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Not(String var1, String var2) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " and(" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "') ";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Not(String var1, String var2, String place) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+
+        if (cond == 0) {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "%')";
+            }
+
+        } else {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " and(" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " and(" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " and(" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "%')";
+            }
+
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Or_Not(String var1, String var2) {
+        
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+        if (cond == 0) {
+            this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " or(" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "') ";
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData like_Or_Not(String var1, String var2, String place) {
+        String table="";
+         if(!this.relatedTable.isEmpty())
+         {
+            table = this.relatedTable; 
+            
+         }
+        else
+            table = this.table;
+        
+
+        if (cond == 0) {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " (" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "%')";
+            }
+
+        } else {
+
+            if (place.equalsIgnoreCase("before")) {
+                this.where += " or(" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "')";
+            }
+
+            if (place.equalsIgnoreCase("after")) {
+                this.where += " or(" + table + "." + var1 + this.space + " not like " + this.space + "'" + var2 + "%')";
+            }
+
+            if (place.equalsIgnoreCase("both")) {
+                this.where += " or(" + table + "." + var1 + this.space + " not like " + this.space + "'%" + var2 + "%')";
+            }
+
+        }
+        cond++;
+        return this;
+    }
+
+    public XJData select(ArrayList<String> array) {
+        this.selected = array;
+        return this;
+    }
+
+    public XJData select(String type, String field) {
+        this.selectedField.add(type);
+        this.selectedField.add(field);
+
+        return this;
+    }
+
+    public XJData distinct() {
+        this.select = " select distinct ";
+        return this;
+    }
+
+    public XJData limit(String limit) {
+        this.limit = limit;
+        return this;
+    }
+
+    public XJData limit(String limit, String offset) {
+        this.limit = limit;
+        this.offset = offset;
+        return this;
+    }
+
+    public String getAggregate() {
+        return this.aggrValue;
+    }
+    
+    public XJData[] get_By(String field, String value) throws ClassNotFoundException, SQLException, Exception{
+        
+        where(field,"=",value);
+        return get();
+        
+    }
+    
+    
+    public XJData[] get(int limit) throws ClassNotFoundException, SQLException, Exception {
+        this.select += " " + this.tablePrefix + this.table + " .* from " + this.tablePrefix + this.table + "";
+        if (cond > 0) {
+            this.select += this.where;
+        }
+        if (gcond > 0) {
+            this.select += this.groupby;
+        }
+        if (hcond > 0) {
+            this.select += this.having;
+        }
+        if (ocond > 0) {
+            this.select += this.orderby;
+        }
+
+        this.select += " limit " + "" + limit + "";
+
+        
+        DBOperations dbobj = new DBOperations();
+        return getAndSet(dbobj.SelectQuery(select));
+    }
+
+    public XJData[] get(int limit, int offset) throws ClassNotFoundException, SQLException, Exception {
+        this.select += " " + this.tablePrefix + this.table + " .* from " + this.tablePrefix + this.table + "";
+        if (cond > 0) {
+            this.select += this.where;
+        }
+
+        if (gcond > 0) {
+            this.select += this.groupby;
+        }
+        if (hcond > 0) {
+            this.select += this.having;
+        }
+        if (ocond > 0) {
+            this.select += this.orderby;
+        }
+
+        this.select += " limit " + "" + offset + "," + limit + "";
+
+        
+        DBOperations dbobj = new DBOperations();
+        return getAndSet(dbobj.SelectQuery(this.select));
+    }
+
+    public XJData[] get() throws ClassNotFoundException, SQLException, Exception {
+
+        if (!selected.isEmpty()) {
+            return get(selected);
+        } else if (!selectedField.isEmpty()) {
+            this.select += " " + this.selectedField.get(0) + "(" + this.selectedField.get(1) + ") from " + this.tablePrefix + this.table;
+            if (cond > 0) {
+                this.select += this.where;
+            }
+            if (gcond > 0) {
+                this.select += this.groupby;
+            }
+            if (hcond > 0) {
+                this.select += this.having;
+            }
+            if (ocond > 0) {
+                this.select += this.orderby;
+            }
+            if (!this.limit.isEmpty() && !this.offset.isEmpty()) {
+                this.select += " limit" + this.space + this.offset + "," + this.limit + "";
+            } else if (!this.limit.isEmpty()) {
+                this.select += " limit " + "" + this.limit + "";
+            }
+
+            System.out.println("select aggregate "+this.select);
+            DBOperations dbobj = new DBOperations();
+            return getAndSet(dbobj.SelectQuery(this.select));
+        } 
+        else if(!this.relatedTable.isEmpty()) 
+        {
+            if (cond > 0) {
+                this.select += this.where;
+            }
+            if (gcond > 0) {
+                this.select += this.groupby;
+            }
+            if (hcond > 0) {
+                this.select += this.having;
+            }
+            if (ocond > 0) {
+                this.select += this.orderby;
+            }
+            if (!this.limit.isEmpty() && !this.offset.isEmpty()) {
+                this.select += " limit" + this.space + this.offset + "," + this.limit + "";
+            } else if (!this.limit.isEmpty()) {
+                this.select += " limit " + "" + this.limit + "";
+            }
+
+            System.out.println("select related "+this.select);
+            DBOperations dbobj = new DBOperations();
+            return getAndSet(dbobj.SelectQuery(this.select));
+        }
+        else
+        {
+            this.select += " " + this.tablePrefix + this.table + " .* from " + this.tablePrefix + this.table + "";
+            if (cond > 0) {
+                this.select += this.where;
+            }
+            if (gcond > 0) {
+                this.select += this.groupby;
+            }
+            if (hcond > 0) {
+                this.select += this.having;
+            }
+            if (ocond > 0) {
+                this.select += this.orderby;
+            }
+            if (!this.limit.isEmpty() && !this.offset.isEmpty()) {
+                this.select += " limit" + this.space + this.offset + "," + this.limit + "";
+            } else if (!this.limit.isEmpty()) {
+                this.select += " limit " + "" + this.limit + "";
+            }
+
+            System.out.println("select normal "+this.select);
+            DBOperations dbobj = new DBOperations();
+            return getAndSet(dbobj.SelectQuery(this.select));
+        }
+
+
+    }
+
+    public XJData[] get_Where(String var1, String op, String var2) throws ClassNotFoundException, SQLException, Exception {
+
+        if (cond == 0) {
+            this.where += " (" + var1 + this.space + op + this.space + "'" + var2 + "')";
+        } else {
+            this.where += " and( " + var1 + this.space + op + this.space + "'" + var2 + "') ";
+        }
+
+        cond++;
+        
+        return get();
+    }
+
+    public XJData[] get(ArrayList<String> colArray) throws ClassNotFoundException, SQLException, Exception {
+        String str = "";
+        for (int i = 0; i < colArray.size(); i++) {
+            str += "" + this.tablePrefix + this.table + "." + colArray.get(i) + ",";
+        }
+        str = str.substring(0, str.lastIndexOf(","));
+        this.select += str + " from " + this.tablePrefix + this.table + "";
+        if (cond > 0) {
+            this.select += this.where;
+        }
+        if (gcond > 0) {
+            this.select += this.groupby;
+        }
+        if (hcond > 0) {
+            this.select += this.having;
+        }
+        if (ocond > 0) {
+            this.select += this.orderby;
+        }
+
+        if (!this.limit.isEmpty() && !this.offset.isEmpty()) {
+            this.select += " limit" + this.space + this.offset + "," + this.limit + "";
+        } else if (!this.limit.isEmpty()) {
+            this.select += " limit " + "" + this.limit + "";
+        }
+
+        
+        DBOperations dbobj = new DBOperations();
+        return getAndSet(dbobj.SelectQuery(this.select), colArray);
+
+    }
+
+    public XJData[] getAndSet(ResultSet resGet) throws ClassNotFoundException, SQLException, Exception {
+        
+        ResultSetMetaData rsMeta = resGet.getMetaData();
+        int colCount = rsMeta.getColumnCount();
+        if (!selectedField.isEmpty()) {
+            data = new XJData[1];
+            data[0] = (XJData) getChild();
+            if (resGet.next()) {
+                data[0].aggrValue = resGet.getString(1);
+                this.aggrValue = resGet.getString(1);
+            }
+            this.clear();
+            return data;
+        }
+
+
+        int cnt = 0, i = 0, j = 0, k = 0, count = 0,end=0,start=0;
+        while (resGet.next()) {
+            count++;
+        }
+        /*String innerSql="select  count(*) from "+this.tablePrefix+ this.table+ " ";
+        if(cond>0)
+        innerSql+=this.where;
+        
+        DBOperations dbobj = new DBOperations();
+        ResultSet res = dbobj.SelectQuery(innerSql);
+        
+        if(res.next())
+        {
+        count = res.getInt(1);
+        }*/
+        String table="";
+        if(!this.relatedTable.isEmpty())
+            table = this.relatedTable;
+        else
+            table = this.table;
+        ResultSet colNumInfo = findingNumColumns(table);
+        if (colNumInfo.next()) {
+            cnt = colNumInfo.getInt(1);
+            System.out.println("count cols "+cnt);
+        }
+
+        String[] colNames = new String[cnt];
+        ResultSet colInfo = findingColumns(table);
+        while (colInfo.next()) {
+            colNames[i] = colInfo.getString("COLUMN_NAME");
+            System.out.print("colnames "+colNames[i]+"\t");
+            i++;
+        }
+
+        data = new XJData[count];
+
+        for (j = 0; j < count; j++) {
+            data[j] = (XJData) getChild();
+        }
+        j = 0;
+        resGet.beforeFirst();
+        if(!relatedTable.isEmpty())
+            {
+                start = colCount-cnt+1;
+                System.out.println("begin "+start);
+                end=cnt+start-1;
+                System.out.println("end "+end);
+            }
+            else 
+            {
+                start=1;
+                end=cnt;
+            }
+        int counter = 0 ;
+        
+        
+        while (resGet.next()) {
+            int index=0;
+            counter++;
+            for (k=start; k <= end; k++) {
+                
+                String s = resGet.getString(k);
+                data[j].fieldValue.put(colNames[index],s);
+                if(counter == 1)
+                    this.fieldValue.put(colNames[index],s);
+                System.out.println(" values  "+s);
+                index++;
+                
+                
+            }
+            System.out.println("key set "+data[j].fieldValue.keySet());
+            System.out.println("key set "+this.fieldValue.keySet());
+            
+            j++;
+        }
+        this.clear();
+        return this.data;
+    }
+
+    private XJData[] getAndSet(ResultSet resGet, ArrayList<String> colArray) throws Exception {
+
+        int cnt = 0, i = 0, j = 0, k = 0, count = 0;
+        while (resGet.next()) {
+            count++;
+        }
+        cnt = colArray.size();
+
+        String[] colNames = new String[cnt];
+        while (i < colArray.size()) {
+            colNames[i] = colArray.get(i);
+            
+            i++;
+        }
+
+        data = new XJData[count];
+
+        for (j = 0; j < count; j++) {
+            data[j] = (XJData) getChild();
+        }
+        j = 0;
+        
+        resGet.beforeFirst();
+        int counter=0;
+        while (resGet.next()) {
+            counter++;
+            for (k = 1; k <= cnt; k++) {
+                
+                data[j].fieldValue.put(colNames[k - 1], resGet.getString(k));
+                if( counter == 1 )
+                    this.fieldValue.put(colNames[k - 1], resGet.getString(k));
+               
+            }
+            j++;
+        }
+        this.clear();
+        return this.data;
+
+    }
+
+    public XJData group_Start() {
+
+        this.where +=  " and (";
+        this.cond = 0;
+        return this;
+    }
+    public XJData group_Or_Start() {
+
+        this.where +=  " or (";
+        this.cond = 0;
+        return this;
+    }
+    public XJData group_Not_Start() {
+
+        this.where +=  " and not (";
+        this.cond = 0;
+        return this;
+    }
+    public XJData group_Or_Not_Start() {
+
+        this.where +=  " or not (";
+        this.cond = 0;
+        return this;
+    }
+    
+
+    public XJData group_End() {
+
+        this.where += ")";
+        this.cond++;
+        return this;
+    }
+
+    public Object getChild() throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        String className = this.getClass().toString();
+        className = className.substring(className.indexOf(" ") + 1, className.length());
+        Class clss = Class.forName(className);
+        Constructor cons = clss.getConstructor();
+        Object o = cons.newInstance();
+        return o;
+
+    }
+
+    public int executeQuery(String sql) throws SQLException, ClassNotFoundException {
+        DBOperations dbobj = new DBOperations();
+        return dbobj.ModifyQuery(sql);
+    }
+
+    public ResultSet selectQuery(String sql) throws SQLException, ClassNotFoundException {
+        DBOperations dbobj = new DBOperations();
+        return dbobj.SelectQuery(sql);
+    }
+
+    private void clear() {
+
+        this.cond = 0;
+        this.hcond = 0;
+        this.groupby = " ";
+        this.having = " having ";
+        this.orderby = "";
+        this.select = " select ";
+        this.where = " where ";
+        this.delete = " delete from ";
+        this.update = " update ";
+        this.selected.clear();
+        this.selectedField.clear();
+        this.relatedClass ="";
+        this.relatedTable = "";
+        this.join_other_as ="";
+        this.join_self_as ="";
+        this.otherRel = "";
+        
+
+    }
+
+    public int remove() throws ClassNotFoundException, SQLException {
+
+        this.delete += this.tablePrefix + this.table;
+        if (cond > 0) {
+            this.delete += this.where;
+        }
+        DBOperations dbobj = new DBOperations();
+        int check = dbobj.ModifyQuery(this.delete);
+        this.clear();
+        return check;
+
+    }
+
+    public int update() throws SQLException, ClassNotFoundException {
+
+        String sql = "";
+        this.update += this.tablePrefix + this.table + " set ";
+        for (int i = 0; i < this.field.size(); i++) {
+            sql += " " + this.field.get(i) + " = " + "'" + this.value.get(i) + "',";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        this.update += sql;
+        if (cond > 0) {
+            this.update += this.where;
+        }
+        DBOperations dbobj = new DBOperations();
+        int check = dbobj.ModifyQuery(this.update);
+        this.clear();
+        return check;
+
+    }
+
+    public int update(ArrayList fields, ArrayList values) throws ClassNotFoundException, SQLException {
+
+        String sql = "";
+        this.update += this.tablePrefix + this.table + " set ";
+        for (int i = 0; i < fields.size(); i++) {
+            sql += " " + fields.get(i) + " = " + "'" + values.get(i) + "',";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        this.update += sql;
+        if (cond > 0) {
+            this.update += this.where;
+        }
+        DBOperations dbobj = new DBOperations();
+        int check = dbobj.ModifyQuery(this.update);
+        this.clear();
+        return check;
+
+    }
+
+    public int update(ArrayList<String> values) throws ClassNotFoundException, SQLException {
+        String newSql = "";
+        this.update += this.tablePrefix + this.table + " set ";
+        for (int i = 0; i < values.size(); i++) {
+            String temp = values.get(i);
+            String[] splitted = temp.split("=");
+            newSql += splitted[0] + " = " + "'" + splitted[1] + "',";
+
+        }
+        newSql = newSql.substring(0, newSql.lastIndexOf(","));
+        this.update += newSql;
+        if (cond > 0) {
+            this.update += this.where;
+        }
+        DBOperations dbobj = new DBOperations();
+        int check = dbobj.ModifyQuery(this.update);
+        this.clear();
+        return check;
+
+    }
+
+    public int update(HashMap updateList) throws ClassNotFoundException, SQLException {
+
+        String sql = "";
+        this.update += this.tablePrefix + this.table + " set ";
+
+        Iterator iterator = updateList.keySet().iterator();
+        String str[] = new String[updateList.size()];
+        int index = 0;
+
+        while (iterator.hasNext()) {
+            str[index] = (String) iterator.next();
+            
+            index++;
+        }
+
+        for (int i = 0; i < updateList.size(); i++) {
+            sql += " " + str[i] + " = " + "'" + updateList.get(str[i]) + "',";
+        }
+        sql = sql.substring(0, sql.lastIndexOf(","));
+        this.update += sql;
+        if (cond > 0) {
+            this.update += this.where;
+        }
+        DBOperations dbobj = new DBOperations();
+        int check = dbobj.ModifyQuery(this.update);
+        this.clear();
+        return check;
+
+    }
+    
+    public XJData setRelation(String relation) throws Exception
+    {
+        String clss = this.getClass().toString();
+        clss =  clss.substring(clss.indexOf(" ")+1,clss.length());
+        Class cls = Class.forName(clss);
+        Constructor co = cls.getConstructor();
+        Object o = co.newInstance();
+        
+        String relName = relation;
+        String []relSplit = null;
+        String []relAttributes = null;
+        
+        if(this.hasOne.contains("'"+relName+"'"+"->"))
+        {
+            System.out.println(" hasone "+ this.hasOne);
+            relSplit = this.hasOne.split("}");
+            for(int i=0 ; i < relSplit.length ; i++)
+            {
+                System.out.println(" relSplit one "+ relSplit[i]);
+                if(relSplit[i].contains("'"+relName+"'"))
+                {
+                    
+                    relSplit[i] = relSplit[i].substring(relSplit[i].indexOf("->")+2,relSplit[i].length());
+                    
+                    relAttributes = relSplit[i].split(",");
+                    System.out.println(" relatt one"+ relAttributes[i]);
+                    break;
+                }
+            }
+        }
+        else if(this.hasMany.contains("'"+relName+"'"+"->"))
+        {
+            System.out.println(" hasMany "+ this.hasMany);
+            relSplit = this.hasMany.split("}");
+            for(int i=0 ; i < relSplit.length ; i++)
+            {
+                System.out.println(" relSplit many"+ relSplit[i]);
+                
+                if(relSplit[i].contains("'"+relName+"'"))
+                {
+                    relSplit[i] = relSplit[i].substring(relSplit[i].indexOf("->")+2,relSplit[i].length());
+                    relAttributes = relSplit[i].split(",");
+                    System.out.println(" relatt many"+ relAttributes[i]);
+                    break;
+                }
+            }
+        }
+        this.relatedClass = relAttributes[0];
+        this.join_self_as = relAttributes[1]; 
+        this.join_other_as = relAttributes[2];
+        this.relatedTable = relAttributes[3];
+        this.otherRel = relAttributes[4];
+        innerSetRelation();
+        for(int i=0;i<relAttributes.length;i++)
+            System.out.println(relAttributes[i]);
+        return this;        
+    }
+    
+    private void innerSetRelation() throws ClassNotFoundException, SQLException
+    {
+        String t1="" ;
+        ResultSet rs1 = findingColumns(this.table);
+        while(rs1.next())
+        {
+            t1+=this.tablePrefix + this.table + "." + rs1.getString("COLUMN_NAME") + " as "+ this.table + rs1.getString("COLUMN_NAME") +",";
+        }
+        
+       
+        String t2="" ;
+        ResultSet rs2 = findingColumns(this.relatedTable);
+        
+        while(rs2.next())
+        {
+            t2+=this.tablePrefix + this.relatedTable + "." + rs2.getString("COLUMN_NAME") + " as "+ this.relatedTable + rs2.getString("COLUMN_NAME") +",";
+        }
+        t2=t2.substring(0,t2.lastIndexOf(","));
+        
+        this.select= " select " + t1 + t2 + " from " + this.tablePrefix + this.table + " inner join " + this.tablePrefix + this.relatedTable + " on " + this.tablePrefix + this.table + "." +  this.join_self_as + this.space+ "=" + this.space + this.tablePrefix + this.relatedTable + "." + this.join_other_as + " where " + this.space +  this.tablePrefix + this.table + ".id" + this.space + " = " + this._("id");
+        cond++;
+        this.where = "";
+        
+        
+    }
+            
+}
+
+

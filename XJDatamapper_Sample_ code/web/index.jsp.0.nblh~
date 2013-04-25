@@ -1,0 +1,60 @@
+<%@page import="Controllers.studentrecord.class_session"%>
+<%@page import="Controllers.studentrecord.session"%>
+<%@page import="Controllers.studentrecord.student_rollno"%>
+<%@page import="Controllers.studentrecord.feesapplicable"%>
+<%@page import="Controllers.studentrecord.student"%>
+<%@page import="Controllers.studentrecord.feeshead"%>
+<%@page import="Controllers.studentrecord.scholar"%>
+<%@page import="Controllers.XJData"%>
+<%@page import="Controllers.studentrecord.class_detail" %>
+<%@page import="java.util.ArrayList"%>
+<%@page contentType="text/html" pageEncoding="UTF-8"%>
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>JSP Page</title>
+    </head>
+    <body>
+        <%
+            XJData clss_detail = new class_detail();
+            clss_detail.where("name","=", "1a").get();
+            XJData sesn = new session();
+            sesn.where("name","=", "2005-2006").get();
+            
+            //out.println(sch.fieldValue.entrySet());
+            //out.println("sch.getSingle(scholar.id) "+sch.getSingle("scholar.id"));
+            
+            
+            XJData clss_sesn = new class_session();
+            clss_sesn.where("class_id","=",clss_detail).where("session_id", "=", sesn).get();
+           
+            out.println("<table  border = 1 cellpadding = 2>");
+            out.println("<tr><td align = 'center'>id</td><td align = 'center'>name</td><td align = 'center'>rollno</td></tr>");
+            
+            for( XJData result1 : clss_sesn.data)
+            {
+                
+                result1.setRelation("class_session->students").get();              
+                for( XJData result2 : result1.data )
+                {
+                    
+                    result2.setRelation("student->scholar").get();
+                    {
+                    
+                        out.println("<tr>");
+                        out.println("<br><td>"+result2.getSingle("scholar.name")+"</td>");                            
+                        out.println("</tr>");
+                    }
+               }
+           }
+       
+            out.println("</table><br>");
+        
+        %>
+  
+    </body>
+</html>

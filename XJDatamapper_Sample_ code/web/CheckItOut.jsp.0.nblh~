@@ -1,0 +1,63 @@
+<%-- 
+    Document   : index
+    Created on : May 1, 2012, 1:23:54 PM
+    Author     : Xavoc Power User
+--%>
+
+<%@page import="Controllers.XJData"%>
+<%@page import="java.util.ArrayList"%>
+<%@page import="Controllers.Models.StudentInformation"%>
+<%@page contentType="text/html" pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>JSP Page</title>
+    </head>
+    <body>
+        
+        <form>
+            
+            <input type="text" name="ID">
+            <input type="text" name="Name">
+            <input type="text" name="Address">
+            <input type="submit" name="finish">
+            
+            <%
+                if(request.getParameter("finish")!=null)
+                {
+                    XJData obj= new StudentInformation();
+                    ArrayList array = new ArrayList();
+                    array.add("1");
+                    array.add("2");
+                    array.add("3");
+                    
+                    //int i=obj.save(array);
+                    //out.println(obj.completeQuery());
+                    //if(i>0)
+                      //  out.println("update");*/
+                    obj.where("ID","=","6").remove();
+                    
+                    /*for(XJData data : obj.data )
+                    {
+                        
+                        out.println("<br>"+data._("ID")+"&nbsp"+data._("Name")+"&nbsp"+data._("Address")+"&nbsp"+"<br>");
+                        data.remove();
+                        
+                    }*/
+                    out.println(obj.completeQuery());
+                    obj.get();
+                    for(XJData data : obj.data )
+                    {
+                        
+                        out.println("<br>"+data._("ID")+"&nbsp"+data._("Name")+"&nbsp"+data._("Address")+"&nbsp"+"<br>");
+                                              
+                    }
+                    
+
+                }
+            %>
+        </form>
+        
+    </body>
+</html>
